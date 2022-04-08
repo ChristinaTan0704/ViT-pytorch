@@ -145,4 +145,4 @@ cython_debug/
 !/output/
 .idea
 
-./checkpoint
+checkpoint/
