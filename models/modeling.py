@@ -89,8 +89,10 @@ class Attention(nn.Module):
 
         context_layer = torch.matmul(attention_probs, value_layer)
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+
         new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
         context_layer = context_layer.view(*new_context_layer_shape)
+        
         attention_output = self.out(context_layer)
         attention_output = self.proj_dropout(attention_output)
         return attention_output, weights
@@ -154,7 +156,7 @@ class Embeddings(nn.Module):
 
     def forward(self, x):
         B = x.shape[0]
-        cls_tokens = self.cls_token.expand(B, -1, -1)
+        cls_tokens = self.cls_token.expand(B, -1, -1) # ! B is the batch_size
 
         if self.hybrid:
             x = self.hybrid_model(x)
@@ -248,12 +250,13 @@ class Encoder(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, config, img_size, vis):
+    def __init__(self, config, img_size, vis=False):
         super(Transformer, self).__init__()
         self.embeddings = Embeddings(config, img_size=img_size)
         self.encoder = Encoder(config, vis)
 
     def forward(self, input_ids):
+
         embedding_output = self.embeddings(input_ids)
         encoded, attn_weights = self.encoder(embedding_output)
         return encoded, attn_weights
@@ -265,12 +268,14 @@ class VisionTransformer(nn.Module):
         self.num_classes = num_classes
         self.zero_head = zero_head
         self.classifier = config.classifier
-
         self.transformer = Transformer(config, img_size, vis)
         self.head = Linear(config.hidden_size, num_classes)
 
     def forward(self, x, labels=None):
-        x, attn_weights = self.transformer(x)
+
+        # ! input -- x.shape = torch.Size([batch_size, 3, 224, 224])
+        x, attn_weights = self.transformer(x) 
+        # ! x.shape = [batch_size, n_patches+1, hidden_size]
         logits = self.head(x[:, 0])
 
         if labels is not None:
